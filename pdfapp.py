@@ -254,6 +254,12 @@ def plot_gr_file(
 
     st.plotly_chart(fig, use_container_width=True)
 
+
+
+if "upload_counter" not in st.session_state:
+    st.session_state["upload_counter"] = 0
+
+
 def main():
     st.set_page_config(layout="wide") 
     st.title(":red[PDF] Processor")
@@ -264,9 +270,48 @@ def main():
     # Upload data and background files
     col_d, col_b = st.columns(2, gap="large")
     with col_d:
-        data_file = st.file_uploader("Upload Data File (.chi)", type="chi")
+        data_files = st.file_uploader(
+            "Upload Data Files (.chi)",
+            type="chi",
+            accept_multiple_files=True,
+            key=f"data_uploader_{st.session_state['upload_counter']}"
+        )
+
+        if "saved_paths" not in st.session_state:
+            st.session_state["saved_paths"] = []
+        upload_dir = os.path.join(os.getcwd(), "data_chi_files")
+        os.makedirs(upload_dir, exist_ok=True)
+        saved_paths = []
+        if data_files:
+            for uf in data_files:
+                dst = os.path.join(upload_dir, uf.name)
+                with open(dst, "wb") as f:
+                    f.write(uf.getbuffer())
+                saved_paths.append(dst)
+        st.session_state["saved_paths"] = saved_paths
     with col_b:
         background_file = st.file_uploader("Upload Background File (.chi)", type="chi")
+
+    filenames = [os.path.basename(p) for p in st.session_state["saved_paths"]]
+    if filenames:
+        selected_name = st.selectbox("Choose data file", filenames, key="selected_name")
+        data_file = os.path.join(upload_dir, selected_name)
+    else:
+        st.info("Please upload and select a data file.")
+        data_file = None
+
+    def clear_uploads(upload_dir=upload_dir):
+        # remove files from disk
+        for fname in os.listdir(upload_dir):
+            os.remove(os.path.join(upload_dir, fname))
+        # clear saved paths and selection
+        st.session_state["saved_paths"] = []
+        if "selected_name" in st.session_state:
+            del st.session_state["selected_name"]
+        # bump the counter to reset the uploader
+        st.session_state["upload_counter"] += 1
+
+    st.button("Clear uploaded files", on_click=clear_uploads)
 
     st.divider()
     composition = st.text_input("Composition (e.g., C6NH8)", value="C8N2H22PbI6")
@@ -305,11 +350,12 @@ def main():
                 os.makedirs(tmpdir)
 
             # Save uploaded files to the temporary directory
-            data_file_path = os.path.join(tmpdir, data_file.name)
+            data_file_path = os.path.join(tmpdir, selected_name)
             background_file_path = os.path.join(tmpdir, background_file.name)
 
-            with open(data_file_path, 'wb') as df:
-                df.write(data_file.read())
+            # with open(data_file_path, 'wb') as df:
+            #     df.write(data_file.read())
+            shutil.copyfile(data_file, data_file_path)
 
             with open(background_file_path, 'wb') as bf:
                 bf.write(background_file.read())
@@ -334,7 +380,7 @@ def main():
             modify_cfg_file(cfg_file_dest, background_file.name, wavelength, dataformat, composition, qmaxinst, qmin, qmax, rmin, rmax, rstep, back_scale, poly)
 
             # Run the command: pdfgetx3 <datafile> from inside the temp directory
-            command = f"pdfgetx3 {data_file.name}"
+            command = f"pdfgetx3 {data_file_path}"
             # st.write(f"Running command: `{command}` from directory: {tmpdir}")
                 
 
@@ -347,10 +393,9 @@ def main():
             if stderr:
                 st.text_area("Command Error:", stderr)
 
-            # Check for the output .gr file in the temp directory
-            output_file_path_gr = os.path.join(tmpdir, data_file.name.replace('.chi', '.gr'))
-            output_file_path_sq = os.path.join(tmpdir, data_file.name.replace('.chi', '.sq'))
-            output_file_path_fq = os.path.join(tmpdir, data_file.name.replace('.chi', '.fq'))
+            output_file_path_gr = data_file_path.replace('.chi', '.gr')
+            output_file_path_sq = data_file_path.replace('.chi', '.sq')
+            output_file_path_fq = data_file_path.replace('.chi', '.fq')
             if os.path.exists(output_file_path_gr):
                 with st.expander('S(q) and F(q) plots'):
                     col7, col8 = st.columns(2)
@@ -382,6 +427,9 @@ def main():
 
     else:
         st.warning("Please upload both files, provide composition, and input a valid wavelength value.")
+
+
+
 
 if __name__ == "__main__":
     main()
