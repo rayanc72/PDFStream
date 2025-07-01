@@ -184,9 +184,9 @@ def plot_gr_file(
     # 2) Decide labels & defaults by extension
     ext = os.path.splitext(file_path)[1].lower()
     settings = {
-        '.gr': {'x':'r (Å)',        'y':'G(r) (1/Å²)',  'title':'r vs. G(r)',  'color':'salmon'},
-        '.fq': {'x':'q (Å⁻¹)',       'y':'F(q) (1/Å)',    'title':'q vs. F(q)',  'color':'royalblue'},
-        '.sq': {'x':'q (Å⁻¹)',       'y':'S(a.u.)',       'title':'q vs. S(a.u.)','color':'seagreen'},
+        '.gr': {'x':'r (Å)',        'y':'G(r) (1/Å²)',  'title':'r vs. G(r)',  'color':'firebrick'},
+        '.fq': {'x':'q (Å⁻¹)',       'y':'F(q) (1/Å)',    'title':'q vs. F(q)',  'color':'darkslategrey'},
+        '.sq': {'x':'q (Å⁻¹)',       'y':'S(a.u.)',       'title':'q vs. S(a.u.)','color':'darkslategrey'},
     }.get(ext)
 
     if settings is None:
@@ -311,7 +311,7 @@ def main():
         # bump the counter to reset the uploader
         st.session_state["upload_counter"] += 1
 
-    st.button("Clear uploaded files", on_click=clear_uploads)
+
 
     st.divider()
     composition = st.text_input("Composition (e.g., C6NH8)", value="C8N2H22PbI6")
@@ -331,7 +331,7 @@ def main():
         poly = st.slider("rpoly", min_value=0.01, max_value=10.0, value=0.9)
     
     with col6:
-        rmin, rmax = st.slider("Select r range", 0.0, 100.0, (0.0, 30.0))
+        rmin, rmax = st.slider("Select r range", 0.0, 40.0, (0.0, 30.0))
         # back_scale = st.number_input("Background scale", min_value=0.01, value=1.0)
         back_scale = st.slider("Background scale", min_value=0.1, max_value=10.0, value=1.0)
 
@@ -427,6 +427,8 @@ def main():
 
     else:
         st.warning("Please upload both files, provide composition, and input a valid wavelength value.")
+
+    st.button("Clear uploaded data files", on_click=clear_uploads, icon="⚠️️️")
 
 
 
