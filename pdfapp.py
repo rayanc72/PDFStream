@@ -328,12 +328,13 @@ def main():
 
     with col5:
         qmin, qmax = st.slider("Select q range", 0.0, 100.0, (0.6, 20.0))
-        poly = st.slider("rpoly", min_value=0.01, max_value=10.0, value=0.9)
+        # poly = st.slider("rpoly", min_value=0.01, max_value=10.0, value=0.9)
+        poly = st.number_input("rpoly", min_value=0.01, value=0.9)
     
     with col6:
         rmin, rmax = st.slider("Select r range", 0.0, 40.0, (0.0, 30.0))
-        # back_scale = st.number_input("Background scale", min_value=0.01, value=1.0)
-        back_scale = st.slider("Background scale", min_value=0.1, max_value=10.0, value=1.0)
+        back_scale = st.number_input("Background scale", min_value=0.01, value=1.0)
+        # back_scale = st.slider("Background scale", min_value=0.1, max_value=10.0, value=1.0)
 
 
     st.divider()
