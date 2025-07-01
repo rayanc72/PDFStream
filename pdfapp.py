@@ -54,65 +54,108 @@ def cleanup_temp_dir(tmpdir):
         shutil.rmtree(tmpdir)
         # st.write(f"Temporary directory {tmpdir} deleted.")
 
-def plot_chi_file(file_path):
-    """Plot Q vs. I from the chi data file using Plotly graph_objects and display the DataFrame."""
-    q_values = []
-    i_values = []
 
-    with open(file_path, 'r') as file:
-        lines = file.readlines()
+def plot_chi_file(
+        data_file: str,
+        background_file: str,
+        bg_scale: float = 1.0,
+        data_color: str = 'blueviolet',
+        bg_color: str = 'gray',
+        data_width: int = 3,
+        bg_width: int = 2,
+        bg_dash: str = 'dash'
+) -> go.Figure:
+    """
+    Plot Q vs. I for both sample (data_file) and scaled background (background_file).
 
-    # # Debug: Print first few lines of the file to verify
-    # st.write("File Content Preview:")
-    # st.write(lines[:10])
+    Parameters
+    ----------
+    data_file : str
+        Path to the chi data file (contains '# chi_Q chi_I' header).
+    background_file : str
+        Path to the background chi file (same format).
+    bg_scale : float, default=1.0
+        Factor by which to multiply the background intensities.
+    data_color : str
+        Line color for the sample data.
+    bg_color : str
+        Line color for the background data.
+    data_width : int
+        Line width for the sample data.
+    bg_width : int
+        Line width for the background data.
+    bg_dash : str
+        Dash style for the background line (e.g., 'dash', 'dot').
 
-    # Flag to indicate when to start reading data
-    data_section = False
+    Returns
+    -------
+    fig : go.Figure
+        A Plotly Figure with both traces.
+    """
 
-    for line in lines:
-        # Skip header lines starting with '#'
-        if line.startswith('#'):
-            if "chi_Q" in line and "chi_I" in line:
-                # Start of the data section
-                data_section = True
-            continue
-
-        # Parse data lines
-        if data_section:
-            parts = line.split()
-            if len(parts) == 2:
-                try:
-                    q = float(parts[0])
-                    i = float(parts[1])
-                    q_values.append(q)
-                    i_values.append(i)
-                except ValueError:
+    def _load_chi(path):
+        if not os.path.isfile(path):
+            raise FileNotFoundError(f"File not found: {path}")
+        q_vals, i_vals = [], []
+        in_data = False
+        with open(path, 'r') as fh:
+            for line in fh:
+                if line.startswith('#'):
+                    if 'chi_Q' in line and 'chi_I' in line:
+                        in_data = True
                     continue
+                if in_data:
+                    parts = line.split()
+                    if len(parts) == 2:
+                        try:
+                            q_vals.append(float(parts[0]))
+                            i_vals.append(float(parts[1]))
+                        except ValueError:
+                            pass
+        return q_vals, i_vals
 
-    # Debug: Print collected data
-    # st.write("Collected Data:")
-    # st.write(f"Q values: {q_values[:10]}")
-    # st.write(f"I values: {i_values[:10]}")
+    # Load both datasets
+    q_data, i_data = _load_chi(data_file)
+    q_bg, i_bg = _load_chi(background_file)
+    # Scale the background intensities
+    i_bg_scaled = [i * bg_scale for i in i_bg]
 
-    # Convert to a pandas DataFrame
-    df = pd.DataFrame({'Q': q_values, 'I': i_values})
-
-    # Debug: Print DataFrame head
-    # st.write("DataFrame Preview:")
-    # st.write(df.head())  # Display the first few rows of the DataFrame
-
-    # Create a plot using Plotly graph_objects
+    # Build the figure
     fig = go.Figure()
-    fig.add_trace(go.Scatter(x=df['Q'], y=df['I'], mode='lines', name='Intensity',line=dict(color='blueviolet', width=3)))
-    fig.update_layout(title='Q vs. I',
-                      xaxis_title='q (Å⁻¹)',
-                      xaxis_tickfont=dict(size=20, color='black'),
-                      xaxis_title_font=dict(size=24, color='black'),
-                      yaxis_title='Intensity',
-                      yaxis_tickfont=dict(size=20, color='black'),
-                      yaxis_title_font=dict(size=24, color='black'),
-                      showlegend=False)
-    
+    fig.add_trace(go.Scatter(
+        x=q_data, y=i_data,
+        mode='lines',
+        name='Sample',
+        line=dict(color=data_color, width=data_width)
+    ))
+    fig.add_trace(go.Scatter(
+        x=q_bg, y=i_bg_scaled,
+        mode='lines',
+        name=f'Background × {bg_scale}',
+        line=dict(color=bg_color, width=bg_width, dash=bg_dash)
+    ))
+
+    fig.update_layout(
+        title='Q vs. I (Sample and Scaled Background)',
+        xaxis_title='q (Å⁻¹)',
+        yaxis_title='Intensity',
+        xaxis_tickfont=dict(size=20, color='black'),
+        xaxis_title_font=dict(size=24, color='black'),
+        yaxis_tickfont=dict(size=20, color='black'),
+        yaxis_title_font=dict(size=24, color='black'),
+        legend=dict(font=dict(size=18)),
+        template='plotly_white'
+    )
+    fig.update_layout(
+        legend=dict(
+            orientation='h',
+            yanchor='bottom',
+            y=0.8,
+            xanchor='center',
+            x=0.8
+        )
+    )
+
     return fig
 
 
@@ -180,9 +223,9 @@ def plot_gr_file(
         return
 
     # 4) Show raw data
-    df = pd.DataFrame({x_label: xs, y_label: ys})
-    with st.expander(f"{title} data"):
-        st.dataframe(df, hide_index=True, use_container_width=True)
+    # df = pd.DataFrame({x_label: xs, y_label: ys})
+    # with st.expander(f"{title} data"):
+    #     st.dataframe(df, hide_index=True, use_container_width=True)
 
     # 5) Configure margins
     if margin is None:
@@ -219,34 +262,42 @@ def main():
     tmpdir = os.path.join(os.getcwd(), "pdfgetx3_temp")
 
     # Upload data and background files
-    data_file = st.file_uploader("Upload Data File (.chi)", type="chi")
-    background_file = st.file_uploader("Upload Background File (.chi)", type="chi")
-    wavelength = st.text_input("Enter Wavelength Value", "0.1665")
+    col_d, col_b = st.columns(2, gap="large")
+    with col_d:
+        data_file = st.file_uploader("Upload Data File (.chi)", type="chi")
+    with col_b:
+        background_file = st.file_uploader("Upload Background File (.chi)", type="chi")
 
-    # Additional input fields for the new parameters
-    
-    composition = st.text_input("Composition (e.g., C6NH8)")
-    dataformat = st.selectbox("Select Data Format", options=["twotheta", "QA", "Qnm"], index=1)
-    qmaxinst = st.number_input("Q Max intensity", min_value=0.0, value=26.5)
-    back_scale=st.number_input("Background scale", min_value=0.01, value=1.0)
-    poly=st.number_input("rpoly", min_value=0.01, value=0.9)
+    st.divider()
+    composition = st.text_input("Composition (e.g., C6NH8)", value="C8N2H22PbI6")
 
-    col1, col2 = st.columns(2)
 
-    with col1:
-        
-        qmin = st.number_input("Q range min", min_value=0.0, value=0.6)
-        rmin = st.number_input("r range min", min_value=0.0, value=0.0)
+    with st.expander('Additional parameters'):
+        dataformat = st.selectbox("Select Data Format", options=["twotheta", "QA", "Qnm"], index=1)
+        rstep = st.number_input("rstep", min_value=0.001, value=0.01)
+        wavelength = st.text_input("Enter Wavelength Value", "0.1665")
+        qmaxinst = st.number_input("Q Max intensity", min_value=0.0, value=26.5)
+
+
+    col5, col6 = st.columns(2, gap="large")
+
+    with col5:
+        qmin, qmax = st.slider("Select q range", 0.0, 100.0, (0.6, 20.0))
+        poly = st.slider("rpoly", min_value=0.01, max_value=10.0, value=0.9)
     
-    with col2:
-        qmax = st.number_input("Q range max", min_value=0.0, value=20.0)
-        rmax = st.number_input("r range max", min_value=0.0, value=30.0)
-    
-    rstep = st.number_input("rstep", min_value=0.001, value=0.01)
+    with col6:
+        rmin, rmax = st.slider("Select r range", 0.0, 100.0, (0.0, 30.0))
+        # back_scale = st.number_input("Background scale", min_value=0.01, value=1.0)
+        back_scale = st.slider("Background scale", min_value=0.1, max_value=10.0, value=1.0)
+
+
+    st.divider()
+
+
 
     # Ensure that files have been uploaded and composition is provided
     if data_file and background_file and wavelength and composition:
-        if st.button("Run"):
+        if st.button("Run", use_container_width=True, type="primary", icon="👊️"):
             cleanup_temp_dir(tmpdir)  # Clean previous run's temp directory
             
             # Create the temporary directory
@@ -265,8 +316,13 @@ def main():
 
 
             # Plot the data file
-            fig = plot_chi_file(data_file_path)
-            st.plotly_chart(fig, use_container_width=True)
+            with st.expander('Q vs I plot', expanded=True):
+                fig = plot_chi_file(
+                         data_file=data_file_path,
+                         background_file=background_file_path,
+                         bg_scale=back_scale
+                            )
+                st.plotly_chart(fig, use_container_width=True)
 
 
             # Copy pdfgetx3.cfg to the temporary directory
@@ -296,27 +352,30 @@ def main():
             output_file_path_sq = os.path.join(tmpdir, data_file.name.replace('.chi', '.sq'))
             output_file_path_fq = os.path.join(tmpdir, data_file.name.replace('.chi', '.fq'))
             if os.path.exists(output_file_path_gr):
-                col3, col4 = st.columns(2)
-                with col3:
-                    with open(output_file_path_fq, 'rb') as f:
-                        # Plot the .gr file
-                        plot_gr_file(output_file_path_fq)
-                        if st.download_button('Download .fq File', f, file_name=os.path.basename(output_file_path_fq)):
-                            # Delete the temporary directory after download
-                            pass
-                with col4:
-                    with open(output_file_path_sq, 'rb') as f:
-                        # Plot the .gr file
-                        plot_gr_file(output_file_path_sq)
-                        if st.download_button('Download .sq File', f, file_name=os.path.basename(output_file_path_sq)):
-                            # Delete the temporary directory after download
-                            pass
+                with st.expander('S(q) and F(q) plots'):
+                    col7, col8 = st.columns(2)
+                    with col7:
+                        with open(output_file_path_fq, 'rb') as f:
+                            # Plot the .gr file
+                            plot_gr_file(output_file_path_fq)
+                            if st.download_button('Download .fq File', f, file_name=os.path.basename(output_file_path_fq), icon="⤵️"):
+                                # Delete the temporary directory after download
+                                pass
+                    with col8:
+                        with open(output_file_path_sq, 'rb') as f:
+                            # Plot the .gr file
+                            plot_gr_file(output_file_path_sq)
+                            if st.download_button('Download .sq File', f, file_name=os.path.basename(output_file_path_sq), icon="⤵️"):
+                                # Delete the temporary directory after download
+                                pass
                 with open(output_file_path_gr, 'rb') as f:
+                    col9, col10, col11 = st.columns([1,10,1])
                     # Plot the .gr file
-                    plot_gr_file(output_file_path_gr)
-                    if st.download_button('Download .gr File', f, file_name=os.path.basename(output_file_path_gr)):
-                        # Delete the temporary directory after download
-                        pass
+                    with col10:
+                        plot_gr_file(output_file_path_gr)
+                        if st.download_button('Download .gr File', f, file_name=os.path.basename(output_file_path_gr), icon="⤵️"):
+                            # Delete the temporary directory after download
+                            pass
 
             else:
                 st.error(f"Failed to generate the .gr file. Check the contents of {tmpdir} for debugging.")
