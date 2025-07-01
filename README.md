@@ -50,10 +50,9 @@ pdf_processor_app/
 │
 ├── pdfapp.py              # Streamlit app (this file)
 ├── pdfgetx3.cfg           # Template config file (will be modified per run)
-├── pdfgetx3_temp/         # Temporary directory for processing
-├── data_chi_files/        # Stores uploaded data files
-├── README.md              # You're reading it!
-└── requirements.txt       # Optional: Python dependencies
+├── pdfgetx3_temp/         # Temporary directory for processing (created automatically)
+├── data_chi_files/        # Stores uploaded data files (created automatically)
+└── README.md              # You're reading it!
 ```
 
 ---
@@ -131,17 +130,9 @@ These files can be visualized directly within the app and downloaded.
 
 ---
 
-## ✅ Example Composition Input
-
-```
-C8N2H22PbI6
-```
-
----
-
 ## 🧹 Cleanup
 
-All temporary files are stored locally and can be deleted manually or via the **Clear uploaded data files** button.
+All temporary data files are stored locally and can be deleted manually or via the **Clear uploaded data files** button.
 
 ---
 
