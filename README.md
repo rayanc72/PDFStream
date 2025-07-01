@@ -1,5 +1,5 @@
 
-# 🧪 PDF Processor App
+# 🧪 PDFApp
 
 A **Streamlit web application** that provides an interactive interface to preprocess and analyze `.chi` files using [PDFgetX3](https://www.diffpy.org/products/pdfgetx.html). The app enables file upload, parameter customization, plotting, and visualization of processed outputs such as **S(q)**, **F(q)**, and **G(r)**.
 
