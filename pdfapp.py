@@ -105,7 +105,7 @@ def plot_chi_file(file_path):
     fig = go.Figure()
     fig.add_trace(go.Scatter(x=df['Q'], y=df['I'], mode='lines', name='Intensity',line=dict(color='blueviolet', width=3)))
     fig.update_layout(title='Q vs. I',
-                      xaxis_title='Q (1/Å)',
+                      xaxis_title='q (Å⁻¹)',
                       xaxis_tickfont=dict(size=20, color='black'),
                       xaxis_title_font=dict(size=24, color='black'),
                       yaxis_title='Intensity',
@@ -116,58 +116,97 @@ def plot_chi_file(file_path):
     return fig
 
 
+def plot_gr_file(
+    file_path: str,
+    marker_size: int   = 6,
+    line_width:  int   = 2,
+    line_color:  str  = None,
+    show_grid:   bool  = True,
+    margin:      dict  = None,
+):
+    """
+    Plot two-column data from .gr, .fq or .sq files.
+    Automatically sets:
+      • x/y axis labels
+      • plot & dataframe titles
+      • default line color
+    based on the extension of file_path.
+    """
 
-def plot_gr_file(file_path):
-    """Plot r vs. G(r) from the .gr file data section using Plotly."""
-    r_values = []
-    g_values = []
+    # 1) Verify file exists
+    if not os.path.isfile(file_path):
+        st.error(f"File not found: {file_path}")
+        return
 
-    with open(file_path, 'r') as file:
-        lines = file.readlines()
+    # 2) Decide labels & defaults by extension
+    ext = os.path.splitext(file_path)[1].lower()
+    settings = {
+        '.gr': {'x':'r (Å)',        'y':'G(r) (1/Å²)',  'title':'r vs. G(r)',  'color':'salmon'},
+        '.fq': {'x':'q (Å⁻¹)',       'y':'F(q) (1/Å)',    'title':'q vs. F(q)',  'color':'royalblue'},
+        '.sq': {'x':'q (Å⁻¹)',       'y':'S(a.u.)',       'title':'q vs. S(a.u.)','color':'seagreen'},
+    }.get(ext)
 
+    if settings is None:
+        st.warning(f"Unknown extension '{ext}', defaulting to .gr settings.")
+        settings = {'x':'r (Å)', 'y':'G(r) (1/Å²)', 'title':'r vs. G(r)', 'color':'salmon'}
 
-    # Flag to identify the start of the data section
-    data_section = False
+    x_label = settings['x']
+    y_label = settings['y']
+    title   = settings['title']
+    default_color = settings['color']
+    color = line_color or default_color
 
-    for line in lines:
-        # Start of the data section
-        if line.startswith('#### start data'):
-            data_section = True
-            continue
-        
-        # End of the data section
-        if data_section and line.startswith('####'):
-            break
-        
-        # Parse data lines
-        if data_section and not line.startswith('#'):
-            parts = line.split()
-            if len(parts) == 2:
-                try:
-                    r = float(parts[0])
-                    g = float(parts[1])
-                    r_values.append(r)
-                    g_values.append(g)
-                except ValueError:
-                    continue
-    # Convert to a pandas DataFrame
-    df = pd.DataFrame({'r': r_values, 'G(r)': g_values})
+    # 3) Read the “#### start data” block
+    xs, ys = [], []
+    in_data = False
+    with open(file_path, 'r') as fh:
+        for line in fh:
+            if line.startswith('#### start data'):
+                in_data = True
+                continue
+            if in_data and line.startswith('####'):
+                break
+            if in_data and not line.startswith('#'):
+                parts = line.split()
+                if len(parts) == 2:
+                    try:
+                        xs.append(float(parts[0]))
+                        ys.append(float(parts[1]))
+                    except ValueError:
+                        continue
 
-    with st.expander('r vs. G(r) data'):
+    if not xs:
+        st.warning(f"No numeric data found in the '#### start data' section of {os.path.basename(file_path)}.")
+        return
+
+    # 4) Show raw data
+    df = pd.DataFrame({x_label: xs, y_label: ys})
+    with st.expander(f"{title} data"):
         st.dataframe(df, hide_index=True, use_container_width=True)
 
-    # Create a Plotly plot
-    fig = go.Figure()
-    fig.add_trace(go.Scatter(x=r_values, y=g_values, mode='lines+markers', name='G(r)', line=dict(color='salmon')))
+    # 5) Configure margins
+    if margin is None:
+        margin = dict(l=60, r=20, t=60, b=60)
+
+    # 6) Build Plotly figure
+    fig = go.Figure(
+        data=go.Scatter(
+            x=xs,
+            y=ys,
+            mode='lines+markers',
+            name=title,
+            line=dict(color=color, width=line_width),
+            marker=dict(size=marker_size),
+        )
+    )
     fig.update_layout(
-        title='r vs. G(r)',
-        xaxis_title='r (Å)',
-        yaxis_title='G(r) (1/Å^2)',
+        title=title,
+        xaxis_title=x_label,
+        yaxis_title=y_label,
         template='plotly_white',
-        xaxis_tickfont=dict(size=20, color='black'),
-        xaxis_title_font=dict(size=24, color='black'),
-        yaxis_tickfont=dict(size=20, color='black'),
-        yaxis_title_font=dict(size=24, color='black')
+        xaxis=dict(showgrid=show_grid, tickfont=dict(size=20, color='black'), title_font=dict(size=24, color='black')),
+        yaxis=dict(showgrid=show_grid, tickfont=dict(size=20, color='black'), title_font=dict(size=24, color='black')),
+        margin=margin,
     )
 
     st.plotly_chart(fig, use_container_width=True)
@@ -253,15 +292,32 @@ def main():
                 st.text_area("Command Error:", stderr)
 
             # Check for the output .gr file in the temp directory
-            output_file_path = os.path.join(tmpdir, data_file.name.replace('.chi', '.gr'))
-            if os.path.exists(output_file_path):
-                # Provide download option
-                with open(output_file_path, 'rb') as f:
+            output_file_path_gr = os.path.join(tmpdir, data_file.name.replace('.chi', '.gr'))
+            output_file_path_sq = os.path.join(tmpdir, data_file.name.replace('.chi', '.sq'))
+            output_file_path_fq = os.path.join(tmpdir, data_file.name.replace('.chi', '.fq'))
+            if os.path.exists(output_file_path_gr):
+                col3, col4 = st.columns(2)
+                with col3:
+                    with open(output_file_path_fq, 'rb') as f:
+                        # Plot the .gr file
+                        plot_gr_file(output_file_path_fq)
+                        if st.download_button('Download .fq File', f, file_name=os.path.basename(output_file_path_fq)):
+                            # Delete the temporary directory after download
+                            pass
+                with col4:
+                    with open(output_file_path_sq, 'rb') as f:
+                        # Plot the .gr file
+                        plot_gr_file(output_file_path_sq)
+                        if st.download_button('Download .sq File', f, file_name=os.path.basename(output_file_path_sq)):
+                            # Delete the temporary directory after download
+                            pass
+                with open(output_file_path_gr, 'rb') as f:
                     # Plot the .gr file
-                    plot_gr_file(output_file_path)
-                    if st.download_button('Download .gr File', f, file_name=os.path.basename(output_file_path)):
+                    plot_gr_file(output_file_path_gr)
+                    if st.download_button('Download .gr File', f, file_name=os.path.basename(output_file_path_gr)):
                         # Delete the temporary directory after download
-                        cleanup_temp_dir(tmpdir)
+                        pass
+
             else:
                 st.error(f"Failed to generate the .gr file. Check the contents of {tmpdir} for debugging.")
 
