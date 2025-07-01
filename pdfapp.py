@@ -262,7 +262,7 @@ if "upload_counter" not in st.session_state:
 
 def main():
     st.set_page_config(layout="wide") 
-    st.title(":red[PDF]App")
+    st.title(":red[PDF]Stream")
 
     # Create a persistent temporary directory in the current working directory
     tmpdir = os.path.join(os.getcwd(), "pdfgetx3_temp")
