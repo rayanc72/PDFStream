@@ -122,7 +122,10 @@ These files can be visualized directly within the app and downloaded.
 
 ## 📌 Notes
 
-- `pdfgetx3` must be installed and callable in the shell.
+- `pdfgetx3` must be installed and callable in the shell. Before running the streamlit command, please make sure pdfgetx3 works fine, by running:
+  `pdfgetx3 --version`
+- Common issues with pdfgetx3 installation can usually be fixed by correcting the required python version (at the time of writing, pdfgetx3 requires Python v3.8). The python version can be checked by running:
+  `python --version`
 - The `pdfgetx3.cfg` file should be available in the app directory and will be modified on-the-fly.
 - This app creates two working folders:
   - `pdfgetx3_temp/` – Temporary for each run
