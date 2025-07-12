@@ -3,6 +3,7 @@ import shutil
 import os
 import subprocess
 import plotly.graph_objects as go
+import numpy as np
 import pandas as pd
 import json
 
@@ -233,8 +234,11 @@ def plot_gr_file(
         margin = dict(l=60, r=20, t=60, b=60)
 
     # 6) Build Plotly figure
-    fig = go.Figure(
-        data=go.Scatter(
+    fig = go.Figure()
+
+    # Add main line plot
+    fig.add_trace(
+        go.Scatter(
             x=xs,
             y=ys,
             mode='lines',
@@ -243,6 +247,27 @@ def plot_gr_file(
             marker=dict(size=marker_size),
         )
     )
+
+    # Add red dashed mean line for fq or sq
+    if ext in ['.fq', '.sq']:
+        y_mean = np.mean(ys)
+        fig.add_shape(
+            type='line',
+            x0=min(xs),
+            x1=max(xs),
+            y0=y_mean,
+            y1=y_mean,
+            line=dict(color='red', width=2, dash='dash'),
+        )
+        fig.add_annotation(
+            x=max(xs)-4.0,
+            y=y_mean+0.5,
+            text=f"mean = {y_mean:.5f}",
+            showarrow=False,
+            font=dict(color='red', size=18),
+            xanchor='left',
+            yanchor='bottom',
+        )
     fig.update_layout(
         title=title,
         xaxis_title=x_label,
