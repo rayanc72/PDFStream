@@ -365,7 +365,7 @@ def main():
     col5, col6 = st.columns(2, gap="large")
     with col5:
         qmaxinst = st.number_input("Q Max intensity", min_value=0.0, value=config_data.get("qmaxinst", 26.5))
-        qmin, qmax = st.slider("Select q range", 0.0, qmaxinst, tuple(config_data.get("q_range", (0.6, 17.0))))
+        qmin, qmax = st.slider("Select q range", 0.0, qmaxinst, tuple(config_data.get("q_range", (0.6, qmaxinst-0.1))))
 
     with col6:
         rmin, rmax = st.slider("Select r range", 0.0, 40.0, tuple(config_data.get("r_range", (0.0, 30.0))))
