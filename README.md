@@ -69,23 +69,23 @@ streamlit run pdfapp.py
 
 - Upload **multiple data files** (`.chi`) and a **background file** (`.chi`).
 - Select one of the data files from the dropdown.
+- Optionally, upload a json configuration file to set parameters from a previous run.
 
 ### 3. Set Parameters:
 
-- Input material **composition** (e.g., `C8N2H22PbI6`)
+- Input material **composition** (e.g., `C10N2H26PbI6`)
 - Choose:
   - Data format: `twotheta`, `QA`, or `Qnm`
   - Wavelength
   - Q-range and R-range
-  - Background scale, rstep, rpoly, qmaxinst
+  - rstep, rpoly, qmaxinst
 
 ### 4. Run:
 
-Click the **"Run"** button to:
+The app runs automatically.
 
-- Apply background subtraction
-- Modify and apply `pdfgetx3.cfg`
-- Run `pdfgetx3`
+Expand the tabs to 
+- modify background subtraction
 - Display:
   - **Q vs I** plot
   - **F(q)**, **S(q)**, **G(r)** plots
@@ -104,8 +104,10 @@ The app generates:
 - `.fq` → Fourier transformed function F(Q)
 - `.sq` → Structure factor S(Q)
 - `.gr` → Real-space pair distribution function G(r)
+- `.json` → Configuration file with parameters used for processing
 
-These files can be visualized directly within the app and downloaded.
+The PDF output files can be visualized directly within the app and downloaded.
+
 
 ---
 
