@@ -3,7 +3,9 @@ import shutil
 import os
 import subprocess
 import plotly.graph_objects as go
+import numpy as np
 import pandas as pd
+import json
 
 def modify_cfg_file(cfg_path, background_file, wavelength, dataformat="QA", composition="", qmaxinst=26.5, 
                     qmin=0.0, qmax=20.0, rmin=0.0, rmax=30.0, rstep=0.01, back_scale=1.0, poly=0.9):
@@ -162,7 +164,7 @@ def plot_chi_file(
 def plot_gr_file(
     file_path: str,
     marker_size: int   = 6,
-    line_width:  int   = 2,
+    line_width:  int   = 4,
     line_color:  str  = None,
     show_grid:   bool  = True,
     margin:      dict  = None,
@@ -232,16 +234,40 @@ def plot_gr_file(
         margin = dict(l=60, r=20, t=60, b=60)
 
     # 6) Build Plotly figure
-    fig = go.Figure(
-        data=go.Scatter(
+    fig = go.Figure()
+
+    # Add main line plot
+    fig.add_trace(
+        go.Scatter(
             x=xs,
             y=ys,
-            mode='lines+markers',
+            mode='lines',
             name=title,
             line=dict(color=color, width=line_width),
             marker=dict(size=marker_size),
         )
     )
+
+    # Add red dashed mean line for fq or sq
+    if ext in ['.fq', '.sq']:
+        y_mean = np.mean(ys)
+        fig.add_shape(
+            type='line',
+            x0=min(xs),
+            x1=max(xs),
+            y0=y_mean,
+            y1=y_mean,
+            line=dict(color='red', width=2, dash='dash'),
+        )
+        fig.add_annotation(
+            x=max(xs)-4.0,
+            y=y_mean+0.5,
+            text=f"mean = {y_mean:.5f}",
+            showarrow=False,
+            font=dict(color='red', size=18),
+            xanchor='left',
+            yanchor='bottom',
+        )
     fig.update_layout(
         title=title,
         xaxis_title=x_label,
@@ -292,6 +318,17 @@ def main():
     with col_b:
         background_file = st.file_uploader("Upload Background File (.chi)", type="chi")
 
+    with st.expander("Optionally upload a saved configuration file"):
+        uploaded_config = st.file_uploader("Optionally Upload Configuration (.json)", type="json")
+        config_data = {}
+
+        if uploaded_config is not None:
+            try:
+                config_data = json.load(uploaded_config)
+                st.success("Configuration loaded.")
+            except Exception as e:
+                st.error(f"Failed to load config: {e}")
+
     filenames = [os.path.basename(p) for p in st.session_state["saved_paths"]]
     if filenames:
         selected_name = st.selectbox("Choose data file", filenames, key="selected_name")
@@ -314,117 +351,134 @@ def main():
 
 
     st.divider()
-    composition = st.text_input("Composition (e.g., C6NH8)", value="C8N2H22PbI6")
-
+    composition = st.text_input(
+        "Composition (e.g., C6NH8)",
+        value=config_data.get("composition", "C8N2H22PbI6")
+    )
 
     with st.expander('Additional parameters'):
-        dataformat = st.selectbox("Select Data Format", options=["twotheta", "QA", "Qnm"], index=1)
-        rstep = st.number_input("rstep", min_value=0.001, value=0.01)
-        wavelength = st.text_input("Enter Wavelength Value", "0.1665")
-        qmaxinst = st.number_input("Q Max intensity", min_value=0.0, value=26.5)
-
+        dataformat = st.selectbox("Select Data Format", options=["twotheta", "QA", "Qnm"],
+                                  index=["twotheta", "QA", "Qnm"].index(config_data.get("dataformat", "QA")))
+        rstep = st.number_input("rstep", min_value=0.001, value=config_data.get("rstep", 0.01))
+        wavelength = st.text_input("Enter Wavelength Value", value=config_data.get("wavelength", "0.1665"))
 
     col5, col6 = st.columns(2, gap="large")
-
     with col5:
-        qmin, qmax = st.slider("Select q range", 0.0, 100.0, (0.6, 20.0))
-        # poly = st.slider("rpoly", min_value=0.01, max_value=10.0, value=0.9)
-        poly = st.number_input("rpoly", min_value=0.01, value=0.9)
-    
+        qmaxinst = st.number_input("Q Max intensity", min_value=0.0, value=config_data.get("qmaxinst", 26.5))
+        qmin, qmax = st.slider("Select q range", 0.0, qmaxinst, tuple(config_data.get("q_range", (0.6, 17.0))))
+
     with col6:
-        rmin, rmax = st.slider("Select r range", 0.0, 40.0, (0.0, 30.0))
-        back_scale = st.number_input("Background scale", min_value=0.01, value=1.0)
-        # back_scale = st.slider("Background scale", min_value=0.1, max_value=10.0, value=1.0)
+        rmin, rmax = st.slider("Select r range", 0.0, 40.0, tuple(config_data.get("r_range", (0.0, 30.0))))
+        poly = st.number_input("rpoly", min_value=0.01, value=config_data.get("poly", 0.9))
 
 
     st.divider()
 
 
 
+
     # Ensure that files have been uploaded and composition is provided
     if data_file and background_file and wavelength and composition:
-        if st.button("Run", use_container_width=True, type="primary", icon="👊️"):
-            cleanup_temp_dir(tmpdir)  # Clean previous run's temp directory
-            
-            # Create the temporary directory
-            if not os.path.exists(tmpdir):
-                os.makedirs(tmpdir)
+    # if st.button("Run", use_container_width=True, type="primary", icon="👊️"):
+        cleanup_temp_dir(tmpdir)  # Clean previous run's temp directory
 
-            # Save uploaded files to the temporary directory
-            data_file_path = os.path.join(tmpdir, selected_name)
-            background_file_path = os.path.join(tmpdir, background_file.name)
+        # Create the temporary directory
+        if not os.path.exists(tmpdir):
+            os.makedirs(tmpdir)
 
-            # with open(data_file_path, 'wb') as df:
-            #     df.write(data_file.read())
-            shutil.copyfile(data_file, data_file_path)
+        # Save uploaded files to the temporary directory
+        data_file_path = os.path.join(tmpdir, selected_name)
+        background_file_path = os.path.join(tmpdir, background_file.name)
 
-            with open(background_file_path, 'wb') as bf:
-                bf.write(background_file.read())
+        # with open(data_file_path, 'wb') as df:
+        #     df.write(data_file.read())
+        shutil.copyfile(data_file, data_file_path)
 
-
-            # Plot the data file
-            with st.expander('Q vs I plot', expanded=True):
-                fig = plot_chi_file(
-                         data_file=data_file_path,
-                         background_file=background_file_path,
-                         bg_scale=back_scale
-                            )
-                st.plotly_chart(fig, use_container_width=True)
+        with open(background_file_path, 'wb') as bf:
+            bf.write(background_file.read())
 
 
-            # Copy pdfgetx3.cfg to the temporary directory
-            cfg_file_src = os.path.join(os.getcwd(), 'pdfgetx3.cfg')
-            cfg_file_dest = os.path.join(tmpdir, 'pdfgetx3.cfg')
-            shutil.copy(cfg_file_src, cfg_file_dest)
+        # Plot the data file
+        with st.expander('Q vs I plot', expanded=False):
+            back_scale = st.number_input("Background scale", min_value=0.01, value=config_data.get("background_scale", 1.0))
+            fig = plot_chi_file(
+                     data_file=data_file_path,
+                     background_file=background_file_path,
+                     bg_scale=back_scale
+                        )
+            st.plotly_chart(fig, use_container_width=True)
 
-            # Modify the configuration file with the additional parameters
-            modify_cfg_file(cfg_file_dest, background_file.name, wavelength, dataformat, composition, qmaxinst, qmin, qmax, rmin, rmax, rstep, back_scale, poly)
 
-            # Run the command: pdfgetx3 <datafile> from inside the temp directory
-            command = f"pdfgetx3 {data_file_path}"
-            # st.write(f"Running command: `{command}` from directory: {tmpdir}")
-                
 
-            # Capture the output and error of the command
-            stdout, stderr = run_command(command, cwd=tmpdir)
+        # Copy pdfgetx3.cfg to the temporary directory
+        cfg_file_src = os.path.join(os.getcwd(), 'pdfgetx3.cfg')
+        cfg_file_dest = os.path.join(tmpdir, 'pdfgetx3.cfg')
+        shutil.copy(cfg_file_src, cfg_file_dest)
 
-            # Display the command output and error on the app page
-            if stdout:
-                st.text_area("Command Output:", stdout)
-            if stderr:
-                st.text_area("Command Error:", stderr)
+        # Modify the configuration file with the additional parameters
+        modify_cfg_file(cfg_file_dest, background_file.name, wavelength, dataformat, composition, qmaxinst, qmin, qmax, rmin, rmax, rstep, back_scale, poly)
 
-            output_file_path_gr = data_file_path.replace('.chi', '.gr')
-            output_file_path_sq = data_file_path.replace('.chi', '.sq')
-            output_file_path_fq = data_file_path.replace('.chi', '.fq')
-            if os.path.exists(output_file_path_gr):
-                with st.expander('S(q) and F(q) plots'):
-                    col7, col8 = st.columns(2)
-                    with col7:
-                        with open(output_file_path_fq, 'rb') as f:
-                            # Plot the .gr file
-                            plot_gr_file(output_file_path_fq)
-                            if st.download_button('Download .fq File', f, file_name=os.path.basename(output_file_path_fq), icon="⤵️"):
-                                # Delete the temporary directory after download
-                                pass
-                    with col8:
-                        with open(output_file_path_sq, 'rb') as f:
-                            # Plot the .gr file
-                            plot_gr_file(output_file_path_sq)
-                            if st.download_button('Download .sq File', f, file_name=os.path.basename(output_file_path_sq), icon="⤵️"):
-                                # Delete the temporary directory after download
-                                pass
-                with open(output_file_path_gr, 'rb') as f:
-                    col9, col10, col11 = st.columns([1,10,1])
-                    # Plot the .gr file
-                    with col10:
-                        plot_gr_file(output_file_path_gr)
-                        if st.download_button('Download .gr File', f, file_name=os.path.basename(output_file_path_gr), icon="⤵️"):
+        # Run the command: pdfgetx3 <datafile> from inside the temp directory
+        command = f"pdfgetx3 {data_file_path}"
+        # st.write(f"Running command: `{command}` from directory: {tmpdir}")
+
+
+        # Capture the output and error of the command
+        stdout, stderr = run_command(command, cwd=tmpdir)
+
+        # Display the command output and error on the app page
+        if stdout:
+            st.text_area("Command Output:", stdout)
+        if stderr:
+            st.text_area("Command Error:", stderr)
+
+        output_file_path_gr = data_file_path.replace('.chi', '.gr')
+        output_file_path_sq = data_file_path.replace('.chi', '.sq')
+        output_file_path_fq = data_file_path.replace('.chi', '.fq')
+        if os.path.exists(output_file_path_gr):
+            with st.expander('S(q) and F(q) plots'):
+                col7, col8 = st.columns(2)
+                with col7:
+                    with open(output_file_path_fq, 'rb') as f:
+                        # Plot the .gr file
+                        plot_gr_file(output_file_path_fq)
+                        if st.download_button('Download .fq File', f, file_name=os.path.basename(output_file_path_fq), icon="⤵️"):
                             # Delete the temporary directory after download
                             pass
+                with col8:
+                    with open(output_file_path_sq, 'rb') as f:
+                        # Plot the .gr file
+                        plot_gr_file(output_file_path_sq)
+                        if st.download_button('Download .sq File', f, file_name=os.path.basename(output_file_path_sq), icon="⤵️"):
+                            # Delete the temporary directory after download
+                            pass
+            with open(output_file_path_gr, 'rb') as f:
+                col9, col10, col11 = st.columns([1,10,1])
+                # Plot the .gr file
+                with col10:
+                    plot_gr_file(output_file_path_gr)
+                    if st.download_button('Download .gr File', f, file_name=os.path.basename(output_file_path_gr), icon="⤵️"):
+                        # Delete the temporary directory after download
+                        pass
 
-            else:
-                st.error(f"Failed to generate the .gr file. Check the contents of {tmpdir} for debugging.")
+            param_config = {
+                "composition": composition,
+                "dataformat": dataformat,
+                "rstep": rstep,
+                "wavelength": wavelength,
+                "qmaxinst": qmaxinst,
+                "q_range": (qmin, qmax),
+                "r_range": (rmin, rmax),
+                "poly": poly,
+                "background_scale": back_scale,
+            }
+
+            config_filename = os.path.splitext(selected_name)[0] + "_config.json"
+            st.download_button("Download Configuration", json.dumps(param_config, indent=2),
+                               file_name=config_filename, mime="application/json")
+
+        else:
+            st.error(f"Failed to generate the .gr file. Check the contents of {tmpdir} for debugging.")
 
     else:
         st.warning("Please upload both files, provide composition, and input a valid wavelength value.")
