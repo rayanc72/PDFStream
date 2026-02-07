@@ -247,8 +247,7 @@ def plot_gr_file(
             marker=dict(size=marker_size),
         )
     )
-
-    # Add red dashed mean line for fq or sq
+  
     if ext in ['.fq', '.sq']:
         y_mean = np.mean(ys)
         fig.add_shape(
