@@ -51,6 +51,7 @@ pdf_processor_app/
 ├── pdfgetx3.cfg           # Template config file (will be modified per run)
 ├── pdfgetx3_temp/         # Temporary directory for processing (created automatically)
 ├── data_chi_files/        # Stores uploaded data files (created automatically)
+├── LICENSE                # Details on MIT license
 └── README.md              # You're reading it!
 ```
 
@@ -142,4 +143,4 @@ All temporary data files are stored locally and can be deleted manually or via t
 
 ## 📄 License
 
-This project is open-source and free to use for academic or personal research purposes.
+This project is open-source and free to use for academic or personal research purposes (see LICENSE for more info).
