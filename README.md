@@ -28,7 +28,6 @@ Make sure you have the following installed:
 
 - [Python ≥ 3.7](https://www.python.org/downloads/)
 - [PDFgetX3](https://www.diffpy.org/products/pdfgetx.html)
-- [Streamlit](https://streamlit.io/)
 - Required Python packages:
 
 ```bash
@@ -48,7 +47,7 @@ conda install -c diffpy pdfgetx3
 ```
 pdf_processor_app/
 │
-├── pdfapp.py              # Streamlit app (this file)
+├── pdfapp.py              # Streamlit app
 ├── pdfgetx3.cfg           # Template config file (will be modified per run)
 ├── pdfgetx3_temp/         # Temporary directory for processing (created automatically)
 ├── data_chi_files/        # Stores uploaded data files (created automatically)
@@ -73,7 +72,7 @@ streamlit run pdfapp.py
 
 ### 3. Set Parameters:
 
-- Input material **composition** (e.g., `C10N2H26PbI6`)
+- Input material **composition** (e.g., `C8N2H22PbI4`)
 - Choose:
   - Data format: `twotheta`, `QA`, or `Qnm`
   - Wavelength
